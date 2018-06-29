@@ -3,7 +3,7 @@
 **Cost-Effective Object Detection: Active Sample Mining with Switchable Selection Criteria**
 
 <a href="http://kezewang.com">Keze Wang</a>,
-<a href="http://www.linliang.net/">Liang Lin</a>
+<a href="http://www.linliang.net/">Liang Lin</a>,
 <a href="https://yanxp.github.io/">Xiaopeng Yan</a>,
 Ziliang Chen,
 Dongyu Zhang,

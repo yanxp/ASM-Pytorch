@@ -7,7 +7,7 @@
 <a href="https://yanxp.github.io/">Xiaopeng Yan</a>,
 Ziliang Chen,
 Dongyu Zhang,
-<a href="http://www4.comp.polyu.edu.hk/~cslzhang/">Lei Zhang</a>,
+<a href="http://www4.comp.polyu.edu.hk/~cslzhang/">Lei Zhang</a>
 
 Sun Yat-Sen University, Presented at [TNNLS](https://cis.ieee.org/ieee-transactions-on-neural-networks-and-learning-systems.html)	
 
@@ -21,7 +21,7 @@ For Academic Research Use Only!
 
 If you find ASM useful in your research, please consider citing:
 
-    @article{wang18ssm,
+    @article{wang18asm,
         Author = {Keze Wang,Liang Lin, Xiaopeng Yan, Ziliang Chen, Dongyu Zhang, Lei Zhang},
         Title = {{ASM}: Cost-Effective Object Detection: Active Sample Mining with Switchable Selection Criteria},
         Journal = {IEEE Transactions on Neural Networks and Learning System(TNNLS)},

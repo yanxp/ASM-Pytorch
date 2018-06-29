@@ -39,19 +39,6 @@ def choose_model(dir):
     lists.sort(key= lambda fn:os.path.getmtime(os.path.join(dir,fn)))
     return lists[-1]
 
-def calcu_iou(A,B):
-    '''
-    calculate two box's iou
-    '''
-    width = min(A[2],B[2])-max(A[0],B[0]) + 1
-    height = min(A[3],B[3])-max(A[1],B[1]) + 1
-    if width<=0 or height<=0:
-        return 0
-    Aarea =(A[2]-A[0])*(A[3]-A[1]+1) 
-    Barea =(B[2]-B[0])*(B[3]-B[1]+1)
-    iner_area = width* height
-    return iner_area/(Aarea+Barea-iner_area)
-
 def load_model(net_file ,path):
     '''
     return caffe.Net'''
@@ -71,7 +58,7 @@ def judge_y(score):
     return np.array(y, dtype=np.int)
 def detect_im(net, detect_idx, imdb,clslambda):
     roidb = imdb.roidb
-    allBox =[]; allScore = [];  allY=[] ; al_idx = []
+    allBox =[]; allScore = [];  allY=[] ;eps =0 ;  al_idx = []
     for i in detect_idx:
         imgpath = imdb.image_path_at(i)
         im = cv2.imread(imgpath)
@@ -100,12 +87,6 @@ def detect_im(net, detect_idx, imdb,clslambda):
             inds = np.where(dets[:, -1] >= CONF_THRESH)[0]
   
             if len(inds) == 0 :
-                #for idx in range(len(keep)):
-                #    bbox = dets[idx, :4]
-                #    BBox.append(bbox)
-                #    k = keep[idx]
-                #    Score.append(scores[k].copy())
-                #    Y.append(judge_y(scores[k]))               
                 continue
 #            vis_detections(im, cls, dets, thresh=CONF_THRESH)
             for j in inds:
@@ -116,10 +97,13 @@ def detect_im(net, detect_idx, imdb,clslambda):
                 Score.append(scores[k].copy())
                 Y.append(judge_y(scores[k]))
                 y = Y[-1]
+                loss = -( (1+y)/2 * np.log(scores[k]) + (1-y)/2 * np.log(1-scores[k]+(1e-30))) 
+                tmp = np.max(1-loss/clslambda)
+                eps = eps if eps >= tmp else tmp
   
         allBox.append(BBox[:]); allScore.append(Score[:]); allY.append(Y[:])
-    return np.array(allScore), np.array(allBox), np.array(allY), al_idx
-def judge_uv(loss, gamma, clslambda):
+    return np.array(allScore), np.array(allBox), np.array(allY), al_idx, eps
+def judge_uv(loss, gamma, clslambda,eps):
     '''
     return 
     u: scalar
@@ -127,82 +111,20 @@ def judge_uv(loss, gamma, clslambda):
     '''
     lsum = np.sum(loss)
     dim = loss.shape[0]
-    v_val = np.zeros((dim,))
+    v = np.zeros((dim,))
 
-    if(lsum > threshold):
-        return False, v_val
-    elif lsum < threshold:
+    if(lsum > gamma):
+        return 1, np.array([eps]*dim)
+    elif lsum < gamma:
         for i,l in enumerate(loss):
             if l > clslambda[i]:
-                v_val[i]=0
+                v[i] = 0
+            elif l<clslambda[i]*(1-eps):
+                  v[i] = eps
             else:
-                v_val[i]=1-l/clslambda[i]
-    return True, v_val
-def image_cross_validation(model,roidb,labeledsample,curr_roidb,pre_box,pre_cls):
-    '''
-    implement image cross validation function
-    to choose the highest consistant proposal
-    '''
-    total_select = 5 # total_select images to paste
-    curr_select = 0
-    cross_validation = 0
-    curr_im = cv2.imread(curr_roidb['image'])
-    # crop proposal from image
-    bbox = pre_box
-    im_proposal = curr_im[int(bbox[1]):int(bbox[3]),int(bbox[0]):int(bbox[2]),:]
-    proposal_height = im_proposal.shape[0]
-    proposal_width = im_proposal.shape[1]
-    avg_score = 0
-    if proposal_width<=0 or proposal_height<=0:
-        return False, 0
-    for i in labeledsample:
-        pre_select_roidb = roidb[i]
-        pre_select_cls = pre_select_roidb['gt_classes']
-        # select image 
-        if pre_cls not in pre_select_cls:
-            select_im = cv2.imread(pre_select_roidb['image'])
-            if proposal_height > select_im.shape[0] or proposal_width> select_im.shape[1]:
-                continue
-            # resize the proposal
-            if proposal_height>0.6*select_im.shape[0] and proposal_width>0.6*select_im.shape[1]:
-                resize_proposal_im =cv2.resize(src=im_proposal,dsize=(int(select_im.shape[1]*0.6),int(select_im.shape[0]*0.6)),interpolation=cv2.INTER_LINEAR)
-            elif proposal_height<0.2*select_im.shape[0] and proposal_width<0.2*select_im.shape[1]:
-                resize_proposal_im = cv2.resize(src=im_proposal,dsize=(int(select_im.shape[1]*0.6),int(select_im.shape[0]*0.6)),interpolation=cv2.INTER_LINEAR)
-            else:
-                resize_proposal_im = im_proposal.copy()
-            proposal_height_resize =  resize_proposal_im.shape[0]
-            proposal_width_resize = resize_proposal_im.shape[1]
-            pasted_image = select_im.copy()
-            start_y = random.randint(0,select_im.shape[0]-proposal_height_resize)
-            start_x = random.randint(0,select_im.shape[1]-proposal_width_resize)
-            original_boxex = [start_x,start_y,start_x+proposal_width_resize,start_y+proposal_height_resize]
-            pasted_image[start_y:start_y+proposal_height_resize,start_x:start_x+proposal_width_resize,:] = resize_proposal_im[0:proposal_height_resize,0:proposal_width_resize,:]
-            # redetect pasted_image
-            # curr_select += 1
-            pred_scores_pasted,pred_boxes_pasted = im_detect(model,pasted_image)
-            boxes_pasted_index = pred_scores_pasted[:,pre_cls].argmax()
-            pred_lattent_score = pred_scores_pasted[boxes_pasted_index,pre_cls]
-            pred_lattent_boxes = pred_boxes_pasted[boxes_pasted_index,4*int(pre_cls):4*(int(pre_cls) + 1)]
-            if len(pred_lattent_boxes) == 0 :
-                continue
-            overlape_iou = calcu_iou(original_boxex,pred_lattent_boxes)
-            curr_select += 1
-#            import time
-#            t0 = time.time()
-#            cv2.imwrite('pasted/'+str(t0)+'.jpg',pasted_image)
-            if pred_lattent_score > 0.5 and overlape_iou > 0.5:
-                cross_validation += 1
-                avg_score += pred_lattent_score
-            else:
-                cross_validation += 0
-            if curr_select >= total_select:
-                break
-        else:
-            continue
-    if cross_validation > total_select/2:
-        return True,avg_score/cross_validation
-    else:
-        return False,0
+                v[i]=1-l/clslambda[i]
+    return 0, v
+
 import matplotlib as mpl
 #mpl.use('Agg')
 import matplotlib.pyplot as plt

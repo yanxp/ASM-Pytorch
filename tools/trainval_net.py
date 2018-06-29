@@ -59,7 +59,7 @@ def parse_args():
                       help='set config keys', default=None,
                       nargs=argparse.REMAINDER)
 ######################## begin #################################
-  parser.add_argument('--enable_al', help='whether or not to use al process',action='store_true',default=False)
+  parser.add_argument('--enable_al', help='whether or not to use al process',action='store_true',default=True)
   parser.add_argument('--enable_ss', help='whether or not to use ss process',action='store_true',default=True)
 ######################### end ##################################
   if len(sys.argv) == 1:
@@ -187,7 +187,7 @@ if __name__ == '__main__':
   # get solver object
   sw = SolverWrapper(net, imdb, train_roidb, valroidb, output_dir, tb_dir,
                      pretrained_model=pretrained_model_name)
-  train_iters = 70000
+  train_iters = 60000
   iters_sum = train_iters;
   sw.train_model(iters_sum)
   while(True):
@@ -207,7 +207,7 @@ if __name__ == '__main__':
       net.cuda()
       print('Process detect the unlabeled images ...')
       # return detect results of the unlabeledidx samples with the latest model
-      scoreMatrix,boxRecord,yVecs, al_idx = detect_im(net,unlabeledidx,unflippedImdb,clslambda)
+      scoreMatrix,boxRecord,yVecs, al_idx ,eps= detect_im(net,unlabeledidx,unflippedImdb,clslambda)
       unlabeledidx = [ x for x in unlabeledidx if x not in al_idx ]
       # record some detect results for updatable
       al_candidate_idx = []  # record al samples index in imdb
@@ -216,13 +216,11 @@ if __name__ == '__main__':
       ss_fake_gt = []  # record fake labels for ss
       cls_loss_sum = np.zeros((imdb.num_classes,)) # record loss for each cls
       cls_sum = 0 # used for update clslambda
-      ss_avg_score = []
       print('Process Self-supervised Sample Mining...')
       for i in range(len(unlabeledidx)):
           im_boxes = []
           im_cls=[]
           cls_sum += len(boxRecord[i])
-          ss_accum_score = 0 # ss_scores of per image
           for j,box in enumerate(boxRecord[i]):
               # score of a box
               boxscore = scoreMatrix[i][j]
@@ -232,22 +230,14 @@ if __name__ == '__main__':
               loss = -((1+y)/2*np.log(boxscore)+(1-y)/2*np.log(1-boxscore+1e-30))
               
               cls_loss_sum += loss
-              # choose v,v_val by loss
-              v,v_val = judge_uv(loss,gamma,clslambda)
+              # choose u,v by loss
+              u,v = judge_uv(loss,gamma,clslambda,eps)
               # SS process
-              if v:
+              if u!=1:
                   if(np.sum(y==1)==1 and np.where(y==1)[0]!= 0):
-                     # add Imgae Cross Validation
-                     pre_cls = np.where(y==1)[0]
-                     pre_box = box
-                     curr_roidb = roidb[unlabeledidx[i]]
-                     cross_validate,avg_score = image_cross_validation(net,roidb,labeledsample,curr_roidb,pre_box,pre_cls)
-                     if cross_validate:
-                         im_boxes.append(box)
-                         im_cls.append(np.where(y==1)[0])
-                         ss_accum_score += float(avg_score)
-                     else:
-                         continue
+                     
+                     im_boxes.append(box)
+                     im_cls.append(np.where(y==1)[0])
                   else:
                      discard_num += 1
                      continue
@@ -259,7 +249,6 @@ if __name__ == '__main__':
                   break
           # replace the fake ground truth for the ss_candidate                                                         
           if len(im_boxes) != 0:
-              ss_avg_score.append(ss_accum_score/len(img_boxes))
               ss_candidate_idx.append(unlabeledidx[i])
               overlaps = np.zeros((len(im_boxes), imdb.num_classes), dtype=np.float32)
               for i in range(len(im_boxes)):
@@ -275,10 +264,6 @@ if __name__ == '__main__':
       # 50% enter AL
       r = np.random.rand(len(al_candidate_idx))
       al_candidate_idx = [x for i,x in enumerate(al_candidate_idx) if r[i]>0.5]
-      # re-rank according to consistency-score
-      ss_avg_score = np.reshape(np.array(ss_avg_score),(-1,))
-      ss_avg_idx = np.argsort(ss_avg_score)[::-1]
-      ss_candidate_idx = [ss_candidate_idx[i] for i in ss_avg_idx]
 
       if args.enable_al:
           # control al proportion
@@ -317,8 +302,8 @@ if __name__ == '__main__':
       next_train_idx = bitmapImdb.nonzero()
       next_train_idx.extend(ss_candidate_idx)
       # update the roidb with ss_fake_gt
+       
       train_roidb = update_training_roidb(imdb,ss_candidate_idx,ss_fake_gt)
-
       next_train_idx = [x + initialnum for x in next_train_idx if x>=initialnum] + [x + initialnum + remainnum for x in next_train_idx if x>=initialnum]
 
       train_idx = list(np.arange(initialnum*2))

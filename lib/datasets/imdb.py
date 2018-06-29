@@ -322,7 +322,8 @@ class Imdbs(imdb):
         for imdb in self.imdb_dict.values():
             position = 0
             while position<= len(ss_candidate):
-                if position == len(ss_candidate) or ss_candidate[position]>=prefix_num_sum+imdb.num_images:
+                if position == len(ss_candidate) or ss_candidate[position]>=prefix_num_sum+int(imdb.num_images/2):
+                #    print('replace gt function:',position,len(ss_candidate),prefix_num_sum)
                     tmpss = [x-prefix_num_sum for x in ss_candidate[:position]]
                     imdb.replace_gt(tmpss,ss_fake_gt[:position],flipped)
                     ss_candidate = ss_candidate[position:]

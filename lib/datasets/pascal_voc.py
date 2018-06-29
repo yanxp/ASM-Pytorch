@@ -124,7 +124,7 @@ class pascal_voc(imdb):
     if flipped:
         self._image_index = self._image_index[:len(gt_roidb)]
     for j,i in enumerate(ss_candidate):
-        if (flipped and i<len(gt_roidb)) or not flipped:
+        if (flipped and i<len(gt_roidb)) :
             gt_roidb[i] = ss_fake_gt[j]
     self._roidb = gt_roidb
     print ('replace gt with ss_fake_gt')

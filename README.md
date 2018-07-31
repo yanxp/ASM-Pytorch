@@ -17,6 +17,14 @@ Sun Yat-Sen University, Presented at [TNNLS](https://cis.ieee.org/ieee-transacti
 
 For Academic Research Use Only!
 
+### Requirements
+
+Python 3.6
+
+OpenCV
+
+PyTorch 0.3
+
 ### Citing ASM
 
 If you find ASM useful in your research, please consider citing:

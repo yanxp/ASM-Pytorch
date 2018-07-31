@@ -17,13 +17,15 @@ Sun Yat-Sen University, Presented at [TNNLS](https://cis.ieee.org/ieee-transacti
 
 For Academic Research Use Only!
 
-### Requirements
+### Strict Requirements
 
 Python 3.6
 
 OpenCV
 
 PyTorch 0.3
+
+Note: PyTorch 0.4 or Python 2.7 is not supported !
 
 ### Citing ASM
 

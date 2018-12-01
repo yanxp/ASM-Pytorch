@@ -13,7 +13,6 @@ Sun Yat-Sen University, Presented at [TNNLS](https://cis.ieee.org/ieee-transacti
 
 <p align=center><img width="80%" src="tools/asm.png"/></p>
 
-The code is provided by [Xiaopeng Yan](https://yanxp.github.io/) ([Xiaoxi Wang](http://www.sysu-hcp.net/people/) also provides contributions).
 ### License
 
 For Academic Research Use Only!
